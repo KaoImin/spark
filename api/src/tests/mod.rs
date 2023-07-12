@@ -2,7 +2,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use common::{
     traits::query::TransactionStorage,
-    types::{relation_db::transaction, H160},
+    types::{relation_db::transaction_history, H160},
     AnyError, Result,
 };
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
@@ -16,8 +16,11 @@ use crate::{adapter::DefaultAPIAdapter, jsonrpc::run_server};
 static RELATION_DB_URL: &str = "sqlite::memory:";
 static ROCKS_DB_PATH: &str = "./free-space/smt";
 
-pub async fn mock_data(hash: String, amount: u32) -> Result<transaction::ActiveModel, AnyError> {
-    Ok(transaction::ActiveModel {
+pub async fn mock_data(
+    hash: String,
+    amount: u32,
+) -> Result<transaction_history::ActiveModel, AnyError> {
+    Ok(transaction_history::ActiveModel {
         address: Set(H160::zero().to_string()),
         timestamp: Set(1),
         operation: Set(1),

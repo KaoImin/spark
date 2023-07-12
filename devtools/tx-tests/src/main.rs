@@ -4,7 +4,7 @@ mod tx;
 
 use common::types::tx_builder::NetworkType;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
-use tx_builder::set_network_type;
+use tx_builder::init_static_variables;
 
 use crate::tx::*;
 
@@ -113,17 +113,17 @@ async fn main() {
     let ckb = match net {
         "dev" => {
             println!("dev net");
-            set_network_type(NetworkType::Devnet);
+            init_static_variables(NetworkType::Devnet, Default::default(), Default::default());
             CkbRpcClient::new("http://127.0.0.1:8114")
         }
         "test" => {
             println!("test net");
-            set_network_type(NetworkType::Testnet);
+            init_static_variables(NetworkType::Testnet, Default::default(), Default::default());
             CkbRpcClient::new("https://testnet.ckb.dev")
         }
         "main" => {
             println!("main net");
-            set_network_type(NetworkType::Mainnet);
+            init_static_variables(NetworkType::Mainnet, Default::default(), Default::default());
             CkbRpcClient::new("https://mainnet.ckb.dev")
         }
         _ => unimplemented!(),

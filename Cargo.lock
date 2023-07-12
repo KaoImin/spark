@@ -4097,6 +4097,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "ckb-jsonrpc-types",
+ "ckb-types",
+ "common",
+ "rpc-client",
+ "storage",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "tap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

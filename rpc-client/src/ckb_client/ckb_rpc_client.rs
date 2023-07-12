@@ -1,8 +1,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ckb_jsonrpc_types::{
-    CellWithStatus, JsonBytes, OutPoint, OutputsValidator, Transaction,
-    TransactionWithStatusResponse, Uint32,
+    BlockView, CellWithStatus, JsonBytes, OutPoint, OutputsValidator, Transaction,
+    TransactionWithStatusResponse, Uint32, Uint64,
 };
 use ckb_types::H256;
 use common::{
@@ -132,6 +132,13 @@ impl CkbRpcClient {
             Option<TransactionWithStatusResponse>,
             hash
         )
+    }
+
+    pub fn get_block_by_number(
+        &self,
+        number: Uint64,
+    ) -> impl Future<Output = Result<Option<BlockView>>> {
+        jsonrpc!("get_block_by_number", self, Option<BlockView>, number)
     }
 }
 

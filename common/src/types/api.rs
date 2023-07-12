@@ -4,6 +4,37 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::axon_rpc_client::{Header, Metadata};
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Pagination {
+    pub page:  u64,
+    pub limit: u64,
+}
+
+impl Pagination {
+    pub fn offset(&self) -> u64 {
+        self.page * self.limit
+    }
+
+    pub fn limit(&self) -> u64 {
+        self.limit
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct PaginationResult<T> {
+    pub total: u64,
+    pub data:  Vec<T>,
+}
+
+impl<T> PaginationResult<T> {
+    pub fn new(data: Vec<T>) -> Self {
+        PaginationResult {
+            total: data.len() as u64,
+            data,
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct ChainState {
     pub epoch:        u64,
@@ -25,6 +56,15 @@ pub enum HistoryEvent {
     Redeem,
 }
 
+impl From<HistoryEvent> for u32 {
+    fn from(value: HistoryEvent) -> Self {
+        match value {
+            HistoryEvent::Add => 0,
+            HistoryEvent::Redeem => 1,
+        }
+    }
+}
+
 impl From<u32> for HistoryEvent {
     fn from(value: u32) -> Self {
         match value {
@@ -40,6 +80,16 @@ pub enum OperationType {
     Stake,
     Delegate,
     Reward,
+}
+
+impl From<OperationType> for u32 {
+    fn from(value: OperationType) -> Self {
+        match value {
+            OperationType::Stake => 0,
+            OperationType::Delegate => 1,
+            OperationType::Reward => 2,
+        }
+    }
 }
 
 impl From<u32> for OperationType {
@@ -89,29 +139,29 @@ impl From<u32> for LockStatusType {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StakeAmount {
-    pub epoch:  u32,
+    pub epoch:  u64,
     pub amount: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StakeRate {
-    pub address:       String,
-    pub stake_rate:    String,
-    pub delegate_rate: String,
+    pub address:       H160,
+    pub stake_rate:    f64,
+    pub delegate_rate: f64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AddressAmount {
     pub address: String,
-    pub amount:  String,
+    pub amount:  u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StakeState {
-    pub total_amount:        u32,
-    pub stake_amount:        u32,
-    pub delegate_amount:     u32,
-    pub withdrawable_amount: u32,
+    pub total_amount:        u64,
+    pub stake_amount:        u64,
+    pub delegate_amount:     u64,
+    pub withdrawable_amount: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -132,14 +182,14 @@ pub struct HistoryTransactions {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RewardState {
-    pub lock_amount:   u32,
-    pub unlock_amount: u32,
+    pub lock_amount:   u64,
+    pub unlock_amount: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RewardHistory {
-    pub epoch:  u32,
-    pub amount: u32,
+    pub epoch:  u64,
+    pub amount: u64,
     pub locked: bool,
     pub from:   RewardFrom,
 }

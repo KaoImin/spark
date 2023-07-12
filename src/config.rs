@@ -8,14 +8,15 @@ use serde::{de, Deserialize};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SparkConfig {
-    pub private_key:        String,
-    pub ckb_node_url:       String,
-    pub rpc_listen_address: SocketAddr,
-    pub rdb_url:            String,
-    pub kvdb_path:          PathBuf,
-    pub network_type:       NetworkType,
-    pub metadata_type_id:   H256,
-    pub checkpoint_type_id: H256,
+    pub private_key:          String,
+    pub ckb_node_url:         String,
+    pub rpc_listen_address:   SocketAddr,
+    pub rdb_url:              String,
+    pub kvdb_path:            PathBuf,
+    pub network_type:         NetworkType,
+    pub axon_token_type_hash: H256,
+    pub metadata_type_id:     H256,
+    pub checkpoint_type_id:   H256,
 }
 
 /// Parse a config from reader.

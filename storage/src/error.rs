@@ -9,5 +9,5 @@ pub enum StorageError {
     RocksDBCreationError(io::Error),
 
     #[error("Sql cursor error {0}")]
-    SqlCursorError(DbErr),
+    SqlCursorError(#[from] DbErr),
 }

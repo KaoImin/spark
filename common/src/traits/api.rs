@@ -1,7 +1,7 @@
 use crate::{types::tx_builder::DelegateRequirement, Result};
 use async_trait::async_trait;
 
-use crate::types::{relation_db::transaction::Model, smt::Address};
+use crate::types::{relation_db::transaction_history::Model, smt::Address};
 
 #[async_trait]
 pub trait APIAdapter: Send + Sync {

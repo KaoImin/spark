@@ -1,25 +1,17 @@
-use std::sync::Arc;
-
 use crate::jsonrpc::AxonStatusRpcServer;
-use common::{
-    traits::{api::APIAdapter, async_trait},
-    types::api::ChainState,
-};
+use common::{traits::async_trait, types::api::ChainState};
 use jsonrpsee::core::RpcResult;
 
-pub struct AxonStatusRpc<Adapter> {
-    _adapter: Arc<Adapter>,
-}
+pub struct AxonStatusRpc {}
 
-impl<Adapter: APIAdapter> AxonStatusRpc<Adapter> {
-    // #[warn(dead_code)]
-    // pub fn new(_adapter: Arc<Adapter>) -> Self {
-    //     Self { _adapter }
-    // }
+impl AxonStatusRpc {
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
 #[async_trait]
-impl<Adapter: APIAdapter + 'static> AxonStatusRpcServer for AxonStatusRpc<Adapter> {
+impl AxonStatusRpcServer for AxonStatusRpc {
     async fn get_chain_state(&self) -> RpcResult<ChainState> {
         unimplemented!()
     }

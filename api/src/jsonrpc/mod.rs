@@ -6,15 +6,17 @@ use crate::jsonrpc::operation::OperationRpc;
 use crate::jsonrpc::query::{AxonStatusRpc, StatusRpcModule};
 
 use common::types::api::{
-    AddressAmount, ChainState, HistoryEvent, OperationType, RewardHistory, RewardState,
-    StakeAmount, StakeHistory, StakeRate, StakeState, StakeTransaction,
+    AddressAmount, ChainState, HistoryEvent, OperationType, Pagination, PaginationResult,
+    RewardHistory, RewardState, StakeAmount, StakeRate, StakeState,
 };
+use common::types::relation_db::transaction_history;
 use common::types::smt::Address;
 use common::types::Transaction;
 use common::{traits::api::APIAdapter, types::H256};
 use jsonrpsee::core::RpcResult;
 use jsonrpsee::proc_macros::rpc;
 use jsonrpsee::server::{ServerBuilder, ServerHandle};
+use storage::RelationDB;
 use tokio::net::ToSocketAddrs;
 
 use std::sync::Arc;
@@ -34,41 +36,32 @@ pub trait AccountHistoryRpc {
     async fn get_stake_history(
         &self,
         addr: Address,
-        page_number: u64,
-        page_size: u64,
-        enent: HistoryEvent,
-        operation_type: OperationType,
-    ) -> RpcResult<Vec<StakeHistory>>;
+        pagination: Pagination,
+        event: HistoryEvent,
+    ) -> RpcResult<PaginationResult<transaction_history::Model>>;
 
     #[method(name = "getRewardHistory")]
     async fn get_reward_history(
         &self,
         addr: Address,
-        page_number: u64,
-        page_size: u64,
-    ) -> RpcResult<RewardHistory>;
+        pagination: Pagination,
+    ) -> RpcResult<PaginationResult<RewardHistory>>;
 
     #[method(name = "getStakeAmountByEpoch")]
     async fn get_stake_amount_by_epoch(
         &self,
+        epoch: u64,
         operation_type: OperationType,
-        page_number: u64,
-        page_size: u64,
-    ) -> RpcResult<Vec<StakeAmount>>;
+    ) -> RpcResult<StakeAmount>;
 
     #[method(name = "getTopStakeAddress")]
-    async fn get_top_stake_address(
-        &self,
-        page_number: u64,
-        page_size: u64,
-    ) -> RpcResult<Vec<AddressAmount>>;
+    async fn get_top_stake_address(&self, limit: u64) -> RpcResult<Vec<AddressAmount>>;
 
     #[method(name = "getLatestStakeTransactions")]
     async fn get_latest_stake_transactions(
         &self,
-        page_number: u64,
-        page_size: u64,
-    ) -> RpcResult<Vec<StakeTransaction>>;
+        pagination: Pagination,
+    ) -> RpcResult<PaginationResult<transaction_history::Model>>;
 }
 
 #[rpc(server)]
@@ -113,13 +106,13 @@ pub trait OperationRpc {
     async fn send_transaction(&self, tx: Transaction) -> RpcResult<H256>;
 }
 
-pub async fn run_server<Adapter: APIAdapter + 'static>(
-    adapter: Arc<Adapter>,
+pub async fn run_server(
+    storage: Arc<RelationDB>,
     url: impl ToSocketAddrs,
 ) -> Result<ServerHandle, ApiError> {
-    let mut module = StatusRpcModule::new(Arc::clone(&adapter)).into_rpc();
-    let axon_rpc = AxonStatusRpc::new(Arc::clone(&adapter)).into_rpc();
-    let op_rpc = OperationRpc::new(adapter).into_rpc();
+    let mut module = StatusRpcModule::new(Arc::clone(&storage)).into_rpc();
+    let axon_rpc = AxonStatusRpc::new().into_rpc();
+    let op_rpc = OperationRpc::new().into_rpc();
     module.merge(axon_rpc).unwrap();
     module.merge(op_rpc).unwrap();
     let server = ServerBuilder::new()
