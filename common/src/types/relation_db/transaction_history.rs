@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 #[sea_orm(table_name = "TRANSACTION_HISTORY")]
 pub struct Model {
     #[sea_orm(column_name = "ID", primary_key, auto_increment = false)]
-    pub id:        u64,
+    pub id:        i64,
     #[sea_orm(column_name = "ADDRESS")]
     pub address:   String,
     #[sea_orm(column_name = "TIMESTAMP")]
-    pub timestamp: u64,
+    pub timestamp: i64,
     #[sea_orm(column_name = "OPERATION")]
     pub operation: u32,
     #[sea_orm(column_name = "EVENT")]
@@ -19,11 +19,11 @@ pub struct Model {
     #[sea_orm(column_name = "TX_HASH")]
     pub tx_hash:   String,
     #[sea_orm(column_name = "TX_BLOCK")]
-    pub tx_block:  u64,
+    pub tx_block:  i64,
     #[sea_orm(column_name = "AMOUNT")]
     pub amount:    i64,
     #[sea_orm(column_name = "EPOCH")]
-    pub epoch:     u64,
+    pub epoch:     i64,
     #[sea_orm(column_name = "STATUS")]
     pub status:    Option<u32>,
 }

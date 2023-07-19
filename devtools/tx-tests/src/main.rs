@@ -113,17 +113,50 @@ async fn main() {
     let ckb = match net {
         "dev" => {
             println!("dev net");
-            init_static_variables(NetworkType::Devnet, Default::default(), Default::default());
+            init_static_variables(
+                NetworkType::Devnet,
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+            );
             CkbRpcClient::new("http://127.0.0.1:8114")
         }
         "test" => {
             println!("test net");
-            init_static_variables(NetworkType::Testnet, Default::default(), Default::default());
+            init_static_variables(
+                NetworkType::Testnet,
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+            );
             CkbRpcClient::new("https://testnet.ckb.dev")
         }
         "main" => {
             println!("main net");
-            init_static_variables(NetworkType::Mainnet, Default::default(), Default::default());
+            init_static_variables(
+                NetworkType::Mainnet,
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+            );
             CkbRpcClient::new("https://mainnet.ckb.dev")
         }
         _ => unimplemented!(),

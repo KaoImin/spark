@@ -6,17 +6,19 @@ use crate::jsonrpc::operation::OperationRpc;
 use crate::jsonrpc::query::{AxonStatusRpc, StatusRpcModule};
 
 use common::types::api::{
-    AddressAmount, ChainState, HistoryEvent, OperationType, Pagination, PaginationResult,
+    AddressAmount, ChainState, DelegateRequirement, OperationType, Pagination, PaginationResult,
     RewardHistory, RewardState, StakeAmount, StakeRate, StakeState,
 };
+use common::types::delta::DelegateDeltas;
 use common::types::relation_db::transaction_history;
 use common::types::smt::Address;
 use common::types::Transaction;
-use common::{traits::api::APIAdapter, types::H256};
+use common::types::H256;
 use jsonrpsee::core::RpcResult;
 use jsonrpsee::proc_macros::rpc;
 use jsonrpsee::server::{ServerBuilder, ServerHandle};
-use storage::RelationDB;
+use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
+use storage::{RelationDB, KVDB};
 use tokio::net::ToSocketAddrs;
 
 use std::sync::Arc;
@@ -36,8 +38,16 @@ pub trait AccountHistoryRpc {
     async fn get_stake_history(
         &self,
         addr: Address,
+        event: Option<u32>,
         pagination: Pagination,
-        event: HistoryEvent,
+    ) -> RpcResult<PaginationResult<transaction_history::Model>>;
+
+    #[method(name = "getDelegateHistory")]
+    async fn get_delegate_history(
+        &self,
+        addr: Address,
+        event: Option<u32>,
+        pagination: Pagination,
     ) -> RpcResult<PaginationResult<transaction_history::Model>>;
 
     #[method(name = "getRewardHistory")]
@@ -50,9 +60,10 @@ pub trait AccountHistoryRpc {
     #[method(name = "getStakeAmountByEpoch")]
     async fn get_stake_amount_by_epoch(
         &self,
-        epoch: u64,
-        operation_type: OperationType,
-    ) -> RpcResult<StakeAmount>;
+        start_epoch: u64,
+        end_epoch: u64,
+        operation: u32,
+    ) -> RpcResult<Vec<StakeAmount>>;
 
     #[method(name = "getTopStakeAddress")]
     async fn get_top_stake_address(&self, limit: u64) -> RpcResult<Vec<AddressAmount>>;
@@ -62,6 +73,12 @@ pub trait AccountHistoryRpc {
         &self,
         pagination: Pagination,
     ) -> RpcResult<PaginationResult<transaction_history::Model>>;
+
+    #[method(name = "getDelegateRecords")]
+    async fn get_delegate_records(&self, addr: Address) -> RpcResult<DelegateDeltas>;
+
+    #[method(name = "getDelegateRequirement")]
+    async fn get_delegate_requirement(&self, staker: Address) -> RpcResult<DelegateRequirement>;
 }
 
 #[rpc(server)]
@@ -108,19 +125,22 @@ pub trait OperationRpc {
 
 pub async fn run_server(
     storage: Arc<RelationDB>,
+    kvdb: Arc<KVDB>,
+    ckb_client: Arc<CkbRpcClient>,
     url: impl ToSocketAddrs,
 ) -> Result<ServerHandle, ApiError> {
-    let mut module = StatusRpcModule::new(Arc::clone(&storage)).into_rpc();
+    let mut module = StatusRpcModule::new(Arc::clone(&storage), kvdb, ckb_client).into_rpc();
     let axon_rpc = AxonStatusRpc::new().into_rpc();
     let op_rpc = OperationRpc::new().into_rpc();
     module.merge(axon_rpc).unwrap();
     module.merge(op_rpc).unwrap();
+
     let server = ServerBuilder::new()
         .http_only()
         .build(url)
         .await
         .map_err(|e| ApiError::HttpServer(e.to_string()))?;
-    println!("addr: {:?}", server.local_addr().unwrap());
+    log::info!("RPC server listening: {:?}", server.local_addr().unwrap());
 
     Ok(server.start(module).unwrap())
 }

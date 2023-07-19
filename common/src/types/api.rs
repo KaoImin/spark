@@ -2,7 +2,12 @@ use crate::types::H160;
 use ckb_types::H256;
 use serde::{Deserialize, Serialize};
 
-use crate::types::axon_rpc_client::{Header, Metadata};
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DelegateRequirement {
+    pub threshold:          u64,
+    pub max_delegator_size: u32,
+    pub commission_rate:    u8,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Pagination {
@@ -37,23 +42,17 @@ impl<T> PaginationResult<T> {
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct ChainState {
-    pub epoch:        u64,
-    pub block_number: u64,
-}
-
-impl ChainState {
-    pub fn new(h: Header, m: Metadata) -> Self {
-        ChainState {
-            block_number: h.number,
-            epoch:        m.version.end.saturating_sub(m.version.start),
-        }
-    }
+    pub epoch:              u64,
+    pub period:             u64,
+    pub block_number:       u64,
+    pub total_stake_amount: u64,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub enum HistoryEvent {
     Add,
     Redeem,
+    Withdraw,
 }
 
 impl From<HistoryEvent> for u32 {
@@ -61,6 +60,7 @@ impl From<HistoryEvent> for u32 {
         match value {
             HistoryEvent::Add => 0,
             HistoryEvent::Redeem => 1,
+            HistoryEvent::Withdraw => 2,
         }
     }
 }
@@ -70,6 +70,7 @@ impl From<u32> for HistoryEvent {
         match value {
             0 => HistoryEvent::Add,
             1 => HistoryEvent::Redeem,
+            2 => HistoryEvent::Withdraw,
             _ => panic!("Invalid value for HistoryEvent"),
         }
     }

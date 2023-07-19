@@ -10,9 +10,15 @@ anyhow = "1.0"
 async-trait = "0.1"
 ckb-jsonrpc-types = "0.108"
 ckb-types = "0.108"
+log = "0.4"
+molecule = "0.7"
 thiserror = "1.0"
 tokio = { version = "1.20", features = ["time"] }
 
 common = { path = "../common" }
 rpc-client = { path = "../rpc-client" }
-storage ={ path = "../storage" }
+storage = { path = "../storage" }
+tx-builder ={ path = "../tx-builder" }
+
+[dev-dependencies]
+hex = "0.4"

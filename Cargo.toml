@@ -6,15 +6,21 @@ edition = "2021"
 
 [dependencies]
 api = { path = "./api" }
+backtrace = "0.3"
 common = { path = "./common" }
 ckb-types = "0.108"
+env_logger = "0.10"
+log = "0.4"
 rpc-client = { path = "./rpc-client" }
 storage = { path = "./storage" }
+sync = { path = "./sync" }
 tx-builder = { path = "./tx-builder" }
 
 serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "1.28", features = ["macros", "rt"] }
+tokio = { version = "1.28", features = ["macros", "rt", "signal"] }
 toml = "0.7"
+tracing = "0.1"
+tracing-subscriber = "0.3"
 
 [workspace]
 members = [

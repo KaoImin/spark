@@ -7,9 +7,11 @@ edition = "2021"
 [dependencies]
 molecule = "0.7"
 jsonrpsee = { version = "0.18", features = ["macros","server","client"] }
+log = "0.4"
 tokio = { version = "1.20", features = ["macros", "rt-multi-thread"] }
 
 common = { path = "../common" }
+rpc-client = { path = "../rpc-client" }
 storage = { path = "../storage" }
 tx-builder = { path = "../tx-builder" }
 
