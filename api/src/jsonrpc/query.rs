@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{atomic::AtomicU64, Arc};
 
 use crate::{
     error::ApiError,
@@ -8,7 +8,8 @@ use common::{
     types::{
         api::{
             AddressAmount, ChainState, DelegateRequirement, OperationType, Pagination,
-            PaginationResult, RewardHistory, RewardState, StakeAmount, StakeRate, StakeState,
+            PaginationResult, RewardHistory, RewardState, RpcDelegateDeltas, StakeAmount,
+            StakeRate, StakeState,
         },
         axon_types::delegate::DelegateCellData,
         delta::DelegateDeltas,
@@ -31,14 +32,22 @@ pub struct StatusRpcModule {
     storage:    Arc<RelationDB>,
     kvdb:       Arc<KVDB>,
     ckb_client: Arc<CkbRpcClient>,
+
+    current_epoch: Arc<AtomicU64>,
 }
 
 impl StatusRpcModule {
-    pub fn new(storage: Arc<RelationDB>, kvdb: Arc<KVDB>, ckb_client: Arc<CkbRpcClient>) -> Self {
+    pub fn new(
+        storage: Arc<RelationDB>,
+        kvdb: Arc<KVDB>,
+        ckb_client: Arc<CkbRpcClient>,
+        current_epoch: Arc<AtomicU64>,
+    ) -> Self {
         Self {
             storage,
             kvdb,
             ckb_client,
+            current_epoch,
         }
     }
 }
@@ -54,7 +63,7 @@ impl AccountHistoryRpcServer for StatusRpcModule {
 
         if res.is_none() {
             return Ok(StakeRate {
-                address:       addr,
+                address:       to_ckb_h160(&addr),
                 stake_rate:    f64::default(),
                 delegate_rate: f64::default(),
             });
@@ -64,7 +73,7 @@ impl AccountHistoryRpcServer for StatusRpcModule {
 
         if res.stake_amount == 0 && res.delegate_amount == 0 {
             return Ok(StakeRate {
-                address:       addr,
+                address:       to_ckb_h160(&addr),
                 stake_rate:    f64::default(),
                 delegate_rate: f64::default(),
             });
@@ -75,7 +84,7 @@ impl AccountHistoryRpcServer for StatusRpcModule {
         let delegate_rate = res.delegate_amount as f64 / sum;
 
         Ok(StakeRate {
-            address: addr,
+            address: to_ckb_h160(&addr),
             stake_rate,
             delegate_rate,
         })
@@ -232,7 +241,7 @@ impl AccountHistoryRpcServer for StatusRpcModule {
         Ok(PaginationResult::new(res))
     }
 
-    async fn get_delegate_records(&self, addr: Address) -> RpcResult<DelegateDeltas> {
+    async fn get_delegate_records(&self, addr: Address) -> RpcResult<RpcDelegateDeltas> {
         let ret = self
             .kvdb
             .get_delegator_status(addr.as_bytes())
@@ -240,7 +249,7 @@ impl AccountHistoryRpcServer for StatusRpcModule {
             .map_err(ApiError::from)?
             .map(|r| DelegateDeltas::decode(&r).unwrap())
             .unwrap_or_default();
-        Ok(ret)
+        Ok(ret.into())
     }
 
     async fn get_delegate_requirement(&self, staker: Address) -> RpcResult<DelegateRequirement> {

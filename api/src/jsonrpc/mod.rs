@@ -5,15 +5,15 @@ use crate::error::ApiError;
 use crate::jsonrpc::operation::OperationRpc;
 use crate::jsonrpc::query::{AxonStatusRpc, StatusRpcModule};
 
+use ckb_jsonrpc_types::TransactionView;
 use common::types::api::{
-    AddressAmount, ChainState, DelegateRequirement, OperationType, Pagination, PaginationResult,
-    RewardHistory, RewardState, StakeAmount, StakeRate, StakeState,
+    AddressAmount, ChainState, DelegateItem, DelegateRequirement, OperationType, Pagination,
+    PaginationResult, RewardHistory, RewardState, RpcDelegateDeltas, StakeAmount, StakeRate,
+    StakeState,
 };
-use common::types::delta::DelegateDeltas;
-use common::types::relation_db::transaction_history;
-use common::types::smt::Address;
-use common::types::Transaction;
-use common::types::H256;
+use common::types::{
+    delta::DelegateDeltas, relation_db::transaction_history, smt::Address, H160, H256,
+};
 use jsonrpsee::core::RpcResult;
 use jsonrpsee::proc_macros::rpc;
 use jsonrpsee::server::{ServerBuilder, ServerHandle};
@@ -21,6 +21,7 @@ use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use storage::{RelationDB, KVDB};
 use tokio::net::ToSocketAddrs;
 
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 #[rpc(server)]
@@ -75,7 +76,7 @@ pub trait AccountHistoryRpc {
     ) -> RpcResult<PaginationResult<transaction_history::Model>>;
 
     #[method(name = "getDelegateRecords")]
-    async fn get_delegate_records(&self, addr: Address) -> RpcResult<DelegateDeltas>;
+    async fn get_delegate_records(&self, addr: Address) -> RpcResult<RpcDelegateDeltas>;
 
     #[method(name = "getDelegateRequirement")]
     async fn get_delegate_requirement(&self, staker: Address) -> RpcResult<DelegateRequirement>;
@@ -98,40 +99,52 @@ pub trait OperationRpc {
     ) -> RpcResult<String>;
 
     #[method(name = "stake")]
-    async fn stake(&self, address: H256, amount: u64) -> RpcResult<String>;
+    async fn stake(&self, address: H160, amount: u64) -> RpcResult<TransactionView>;
 
     #[method(name = "unstake")]
-    async fn unstake(&self, address: H256, amount: u64) -> RpcResult<String>;
+    async fn unstake(&self, address: H160, amount: u64) -> RpcResult<TransactionView>;
 
     #[method(name = "delegate")]
-    async fn delegate(&self, address: H256, amount: u64) -> RpcResult<String>;
+    async fn delegate(&self, address: H160, infos: Vec<DelegateItem>)
+        -> RpcResult<TransactionView>;
 
     #[method(name = "undelegate")]
-    async fn undelegate(&self, address: H256, amount: u64) -> RpcResult<String>;
+    async fn undelegate(
+        &self,
+        address: H160,
+        infos: Vec<DelegateItem>,
+    ) -> RpcResult<TransactionView>;
 
     #[method(name = "withdrawStake")]
     async fn withdraw_stake(
         &self,
-        address: H256,
+        address: H160,
         withdraw_type: OperationType,
-    ) -> RpcResult<String>;
+    ) -> RpcResult<TransactionView>;
 
     #[method(name = "withdrawRewards")]
-    async fn withdraw_rewards(&self, address: H256) -> RpcResult<String>;
+    async fn withdraw_rewards(&self, address: H160) -> RpcResult<TransactionView>;
 
     #[method(name = "sendTransaction")]
-    async fn send_transaction(&self, tx: Transaction) -> RpcResult<H256>;
+    async fn send_transaction(&self, tx: TransactionView) -> RpcResult<ckb_types::H256>;
 }
 
 pub async fn run_server(
     storage: Arc<RelationDB>,
     kvdb: Arc<KVDB>,
     ckb_client: Arc<CkbRpcClient>,
+    current_epoch: Arc<AtomicU64>,
     url: impl ToSocketAddrs,
 ) -> Result<ServerHandle, ApiError> {
-    let mut module = StatusRpcModule::new(Arc::clone(&storage), kvdb, ckb_client).into_rpc();
+    let mut module = StatusRpcModule::new(
+        Arc::clone(&storage),
+        kvdb,
+        Arc::clone(&ckb_client),
+        Arc::clone(&current_epoch),
+    )
+    .into_rpc();
     let axon_rpc = AxonStatusRpc::new().into_rpc();
-    let op_rpc = OperationRpc::new().into_rpc();
+    let op_rpc = OperationRpc::new(ckb_client, current_epoch).into_rpc();
     module.merge(axon_rpc).unwrap();
     module.merge(op_rpc).unwrap();
 

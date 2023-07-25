@@ -284,11 +284,7 @@ impl RelationDB {
 
         Ok(StakeAmount {
             epoch,
-            amount: res
-                .iter()
-                .map(|r| r.amount as u128)
-                .sum::<u128>()
-                .to_string(),
+            amount: res.iter().map(|r| r.amount as u64).sum(),
         })
     }
 

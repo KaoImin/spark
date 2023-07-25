@@ -19,6 +19,7 @@ pub struct SparkConfig {
     pub xudt_owner:             H256,
     pub issuance_type_id:       H256,
     pub metadata_type_id:       H256,
+    pub metadata_code_hash:     H256,
     pub checkpoint_type_id:     H256,
     pub stake_at_code_hash:     H256,
     pub delegate_at_code_hash:  H256,
@@ -27,9 +28,21 @@ pub struct SparkConfig {
 }
 
 impl SparkConfig {
-    pub fn smt_db(&self) -> PathBuf {
+    pub fn stake_smt_db(&self) -> PathBuf {
         let mut path = self.kvdb_path.clone();
-        path.push("smt");
+        path.push("stake_smt");
+        path
+    }
+
+    pub fn delegate_smt_db(&self) -> PathBuf {
+        let mut path = self.kvdb_path.clone();
+        path.push("delegate_smt");
+        path
+    }
+
+    pub fn reward_smt_db(&self) -> PathBuf {
+        let mut path = self.kvdb_path.clone();
+        path.push("reward_smt");
         path
     }
 

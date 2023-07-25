@@ -1,6 +1,39 @@
-use crate::types::H160;
-use ckb_types::H256;
+use crate::types::delta::DelegateDeltas;
+use ckb_types::{H160, H256};
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RpcDelegateDeltas {
+    pub inner: Vec<RpcDelegateDelta>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RpcDelegateDelta {
+    pub staker: H160,
+    pub amount: u64,
+}
+
+impl From<DelegateDeltas> for RpcDelegateDeltas {
+    fn from(v: DelegateDeltas) -> Self {
+        Self {
+            inner: v
+                .inner
+                .into_iter()
+                .map(|(k, v)| RpcDelegateDelta {
+                    staker: k,
+                    amount: v.delta.amount as u64,
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DelegateItem {
+    pub staker:      H160,
+    pub amount:      u64,
+    pub is_increase: bool,
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DelegateRequirement {
@@ -141,7 +174,7 @@ impl From<u32> for LockStatusType {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StakeAmount {
     pub epoch:  u64,
-    pub amount: String,
+    pub amount: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

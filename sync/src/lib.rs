@@ -1,5 +1,6 @@
 mod error;
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -7,18 +8,20 @@ use anyhow::Result;
 use ckb_jsonrpc_types::BlockView;
 use ckb_jsonrpc_types::TransactionView;
 use ckb_types::prelude::*;
+use common::traits::smt::{DelegateSmtStorage, RewardSmtStorage, StakeSmtStorage};
 use common::types::api::OperationType;
 use common::types::axon_types::delegate::{DelegateArgs, DelegateAtCellData};
+use common::types::axon_types::metadata::MetadataCellData;
 use common::types::axon_types::stake::{StakeArgs, StakeAtCellData};
 use common::types::delta::{DelegateDelta, DelegateDeltas, Delta};
 use common::types::relation_db::transaction_history;
-use common::utils::convert::to_h160;
+use common::utils::convert::{to_h160, to_u64};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
-use storage::{RelationDB, KVDB};
+use storage::{RelationDB, SmtManager, KVDB};
 use tokio::time::sleep;
 use tx_builder::ckb::{
     AXON_TOKEN_ARGS, DELEGATE_AT_CODE_HASH, DELEGATE_SMT_CODE_HASH, ISSUANCE_TYPE_ID,
-    STAKE_AT_CODE_HASH, STAKE_SMT_CODE_HASH,
+    METADATA_CODE_HASH, METADATA_TYPE_ID, STAKE_AT_CODE_HASH, STAKE_SMT_CODE_HASH,
 };
 
 macro_rules! match_err {
@@ -37,7 +40,12 @@ pub struct Synchronization {
     ckb_rpc_client: Arc<CkbRpcClient>,
     storage:        Arc<RelationDB>,
     kvdb:           Arc<KVDB>,
+    stake_smt:      Arc<SmtManager>,
+    delegate_smt:   Arc<SmtManager>,
+    reward_smt:     Arc<SmtManager>,
+
     current_number: u64,
+    current_epoch:  Arc<AtomicU64>,
 }
 
 impl Synchronization {
@@ -45,7 +53,11 @@ impl Synchronization {
         ckb_rpc_client: Arc<CkbRpcClient>,
         storage: Arc<RelationDB>,
         kvdb: Arc<KVDB>,
+        stake_smt: Arc<SmtManager>,
+        delegate_smt: Arc<SmtManager>,
+        reward_smt: Arc<SmtManager>,
         current_number: u64,
+        current_epoch: Arc<AtomicU64>,
     ) -> Self {
         let current_number = storage
             .get_latest_block_number()
@@ -57,7 +69,11 @@ impl Synchronization {
             ckb_rpc_client,
             storage,
             kvdb,
+            stake_smt,
+            delegate_smt,
+            reward_smt,
             current_number,
+            current_epoch,
         }
     }
 
@@ -100,7 +116,14 @@ impl Synchronization {
         log::info!("[sync] parse block: {:?}", block_number);
 
         for tx in block.transactions.iter() {
-            if self.is_update_stake_smt_tx(tx) {
+            if let Some(epoch) = self.get_metadata_cell_epoch(tx) {
+                log::info!("[sync] new epoch: {}", epoch);
+
+                self.current_epoch.swap(epoch, Ordering::SeqCst);
+                StakeSmtStorage::new_epoch(self.stake_smt.as_ref(), epoch).await?;
+                DelegateSmtStorage::new_epoch(self.delegate_smt.as_ref(), epoch).await?;
+                self.kvdb.insert_current_epoch(epoch).await?;
+            } else if self.is_update_stake_smt_tx(tx) {
                 continue;
             } else if self.is_delegate_smt_tx(tx) {
                 continue;
@@ -308,6 +331,23 @@ impl Synchronization {
                     && c.lock.code_hash == **DELEGATE_AT_CODE_HASH.load()
                 {
                     return Some(i);
+                }
+            }
+        }
+
+        None
+    }
+
+    fn get_metadata_cell_epoch(&self, tx: &TransactionView) -> Option<u64> {
+        for (i, c) in tx.inner.outputs.iter().enumerate() {
+            if let Some(type_script) = c.type_.clone() {
+                if type_script.code_hash == **METADATA_CODE_HASH.load()
+                    && type_script.args.as_bytes() == (*METADATA_TYPE_ID.load()).as_bytes()
+                {
+                    let data = MetadataCellData::new_unchecked(
+                        tx.inner.outputs_data[i].clone().into_bytes(),
+                    );
+                    return Some(to_u64(&data.epoch()));
                 }
             }
         }

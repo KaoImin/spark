@@ -124,6 +124,7 @@ async fn main() {
                 Default::default(),
                 Default::default(),
                 Default::default(),
+                Default::default(),
             );
             CkbRpcClient::new("http://127.0.0.1:8114")
         }
@@ -140,6 +141,7 @@ async fn main() {
                 Default::default(),
                 Default::default(),
                 Default::default(),
+                Default::default(),
             );
             CkbRpcClient::new("https://testnet.ckb.dev")
         }
@@ -147,6 +149,7 @@ async fn main() {
             println!("main net");
             init_static_variables(
                 NetworkType::Mainnet,
+                Default::default(),
                 Default::default(),
                 Default::default(),
                 Default::default(),

@@ -11,6 +11,7 @@ pub fn init_static_variables(
     xudt_owner: H256,
     issuance_type_id: H256,
     metadata_type_id: H256,
+    metadata_code_hash: H256,
     checkpoint_type_id: H256,
     stake_at_code_hash: H256,
     stake_smt_type_id: H256,
@@ -22,6 +23,7 @@ pub fn init_static_variables(
     (*ckb::XUDT_OWNER).swap(Arc::new(xudt_owner));
     (*ckb::ISSUANCE_TYPE_ID).swap(Arc::new(issuance_type_id));
     (*ckb::METADATA_TYPE_ID).swap(Arc::new(metadata_type_id));
+    (*ckb::METADATA_CODE_HASH).swap(Arc::new(metadata_code_hash));
     (*ckb::CHECKPOINT_TYPE_ID).swap(Arc::new(checkpoint_type_id));
     (*ckb::STAKE_AT_CODE_HASH).swap(Arc::new(stake_at_code_hash));
     (*ckb::DELEGATE_AT_CODE_HASH).swap(Arc::new(delegate_at_code_hash));
