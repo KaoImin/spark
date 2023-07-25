@@ -15,7 +15,8 @@ use common::types::axon_types::metadata::MetadataCellData;
 use common::types::axon_types::stake::{StakeArgs, StakeAtCellData};
 use common::types::delta::{DelegateDelta, DelegateDeltas, Delta};
 use common::types::relation_db::transaction_history;
-use common::utils::convert::{to_h160, to_u64};
+use common::types::smt::UserAmount;
+use common::utils::convert::{to_eth_h160, to_h160, to_u64};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use storage::{RelationDB, SmtManager, KVDB};
 use tokio::time::sleep;
@@ -274,6 +275,16 @@ impl Synchronization {
         self.kvdb
             .insert_staker_status(&staker.0, &new.encode())
             .await?;
+        StakeSmtStorage::insert(
+            self.stake_smt.as_ref(),
+            self.current_epoch.load(Ordering::SeqCst),
+            vec![UserAmount {
+                user:        to_eth_h160(&staker),
+                amount:      delta.amount() as u128,
+                is_increase: delta.is_increase,
+            }],
+        )
+        .await?;
 
         Ok(())
     }

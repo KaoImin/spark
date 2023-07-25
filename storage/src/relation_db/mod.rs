@@ -337,13 +337,13 @@ impl RelationDB {
 
     pub async fn get_latest_stake_transactions(
         &self,
-        offset: u64,
+        _offset: u64,
         limit: u64,
     ) -> Result<Vec<transaction_history::Model>> {
-        let mut cursor = transaction_history::Entity::find()
-            .order_by_desc(transaction_history::Column::Timestamp)
-            .cursor_by(transaction_history::Column::Id);
-        cursor.after(offset).before(offset + limit);
+        let mut cursor =
+            transaction_history::Entity::find().cursor_by(transaction_history::Column::Timestamp);
+        cursor.last(limit);
+
         match cursor.all(&self.db).await {
             Ok(records) => Ok(records),
             Err(e) => Err(StorageError::SqlCursorError(e).into()),

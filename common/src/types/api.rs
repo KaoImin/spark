@@ -50,7 +50,8 @@ pub struct Pagination {
 
 impl Pagination {
     pub fn offset(&self) -> u64 {
-        self.page * self.limit
+        let page = self.page.saturating_sub(1);
+        page * self.limit
     }
 
     pub fn limit(&self) -> u64 {
