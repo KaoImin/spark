@@ -72,7 +72,7 @@ pub async fn reward_tx(ckb: &CkbRpcClient) {
             delegate_smt_type_id: type_ids.delegate_smt_type_id.into_h256().unwrap(),
             xudt_owner:           type_ids.xudt_owner.into_h256().unwrap(),
         },
-        smt,
+        &smt,
         RewardInfo {
             base_reward:               100,
             half_reward_cycle:         200,

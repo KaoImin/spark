@@ -40,7 +40,7 @@ pub struct StakeSmtTxBuilder<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> {
     current_epoch:     Epoch,
     quorum:            u16,
     stake_cells:       Vec<Cell>,
-    stake_smt_storage: S,
+    stake_smt_storage: &'a S,
     type_ids:          StakeSmtTypeIds,
 }
 
@@ -55,7 +55,7 @@ impl<'a, C: CkbRpc, S: StakeSmtStorage + Send + Sync> IStakeSmtTxBuilder<'a, C, 
         type_ids: StakeSmtTypeIds,
         quorum: u16,
         stake_cells: Vec<Cell>,
-        stake_smt_storage: S,
+        stake_smt_storage: &'a S,
     ) -> Self {
         Self {
             ckb,

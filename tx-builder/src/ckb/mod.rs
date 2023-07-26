@@ -16,7 +16,7 @@ pub mod withdraw;
 use arc_swap::ArcSwap;
 use bytes::Bytes;
 use ckb_types::H256;
-use common::types::tx_builder::{NetworkType, StakeTypeIds};
+use common::types::tx_builder::{DelegateSmtTypeIds, NetworkType, StakeSmtTypeIds, StakeTypeIds};
 
 lazy_static::lazy_static! {
     pub static ref NETWORK_TYPE: ArcSwap<NetworkType> = ArcSwap::from_pointee(NetworkType::Testnet);
@@ -37,5 +37,23 @@ pub fn stake_type_ids() -> StakeTypeIds {
         metadata_type_id:   (*METADATA_TYPE_ID.load_full()).clone(),
         checkpoint_type_id: (*CHECKPOINT_TYPE_ID.load_full()).clone(),
         xudt_owner:         (*XUDT_OWNER.load_full()).clone(),
+    }
+}
+
+pub fn stake_smt_type_ids() -> StakeSmtTypeIds {
+    StakeSmtTypeIds {
+        metadata_type_id:   (*METADATA_TYPE_ID.load_full()).clone(),
+        stake_smt_type_id:  (*STAKE_SMT_CODE_HASH.load_full()).clone(),
+        checkpoint_type_id: (*CHECKPOINT_TYPE_ID.load_full()).clone(),
+        xudt_owner:         (*XUDT_OWNER.load_full()).clone(),
+    }
+}
+
+pub fn delegate_smt_type_ids() -> DelegateSmtTypeIds {
+    DelegateSmtTypeIds {
+        metadata_type_id:     (*METADATA_TYPE_ID.load_full()).clone(),
+        delegate_smt_type_id: (*DELEGATE_SMT_CODE_HASH.load_full()).clone(),
+        checkpoint_type_id:   (*CHECKPOINT_TYPE_ID.load_full()).clone(),
+        xudt_owner:           (*XUDT_OWNER.load_full()).clone(),
     }
 }

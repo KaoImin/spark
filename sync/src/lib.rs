@@ -8,7 +8,9 @@ use anyhow::Result;
 use ckb_jsonrpc_types::BlockView;
 use ckb_jsonrpc_types::TransactionView;
 use ckb_types::prelude::*;
+use ckb_types::{packed, H256};
 use common::traits::smt::{DelegateSmtStorage, RewardSmtStorage, StakeSmtStorage};
+use common::traits::tx_builder::{IDelegateSmtTxBuilder, IStakeSmtTxBuilder};
 use common::types::api::OperationType;
 use common::types::axon_types::delegate::{DelegateArgs, DelegateAtCellData};
 use common::types::axon_types::metadata::MetadataCellData;
@@ -16,13 +18,15 @@ use common::types::axon_types::stake::{StakeArgs, StakeAtCellData};
 use common::types::delta::{DelegateDelta, DelegateDeltas, Delta};
 use common::types::relation_db::transaction_history;
 use common::types::smt::UserAmount;
-use common::utils::convert::{to_eth_h160, to_h160, to_u64};
+use common::utils::convert::{to_eth_h160, to_h160, to_u128, to_u64};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use storage::{RelationDB, SmtManager, KVDB};
 use tokio::time::sleep;
+use tx_builder::ckb::{delegate_smt::DelegateSmtTxBuilder, stake_smt::StakeSmtTxBuilder};
 use tx_builder::ckb::{
-    AXON_TOKEN_ARGS, DELEGATE_AT_CODE_HASH, DELEGATE_SMT_CODE_HASH, ISSUANCE_TYPE_ID,
-    METADATA_CODE_HASH, METADATA_TYPE_ID, STAKE_AT_CODE_HASH, STAKE_SMT_CODE_HASH,
+    delegate_smt_type_ids, stake_smt_type_ids, AXON_TOKEN_ARGS, DELEGATE_AT_CODE_HASH,
+    DELEGATE_SMT_CODE_HASH, ISSUANCE_TYPE_ID, METADATA_CODE_HASH, METADATA_TYPE_ID,
+    STAKE_AT_CODE_HASH, STAKE_SMT_CODE_HASH,
 };
 
 macro_rules! match_err {
@@ -47,6 +51,8 @@ pub struct Synchronization {
 
     current_number: u64,
     current_epoch:  Arc<AtomicU64>,
+
+    priv_key: H256,
 }
 
 impl Synchronization {
@@ -59,6 +65,7 @@ impl Synchronization {
         reward_smt: Arc<SmtManager>,
         current_number: u64,
         current_epoch: Arc<AtomicU64>,
+        priv_key: H256,
     ) -> Self {
         let current_number = storage
             .get_latest_block_number()
@@ -75,6 +82,7 @@ impl Synchronization {
             reward_smt,
             current_number,
             current_epoch,
+            priv_key,
         }
     }
 
@@ -120,10 +128,7 @@ impl Synchronization {
             if let Some(epoch) = self.get_metadata_cell_epoch(tx) {
                 log::info!("[sync] new epoch: {}", epoch);
 
-                self.current_epoch.swap(epoch, Ordering::SeqCst);
-                StakeSmtStorage::new_epoch(self.stake_smt.as_ref(), epoch).await?;
-                DelegateSmtStorage::new_epoch(self.delegate_smt.as_ref(), epoch).await?;
-                self.kvdb.insert_current_epoch(epoch).await?;
+                self.handle_new_epoch(epoch).await?;
             } else if self.is_update_stake_smt_tx(tx) {
                 continue;
             } else if self.is_delegate_smt_tx(tx) {
@@ -149,6 +154,14 @@ impl Synchronization {
         Ok(())
     }
 
+    async fn handle_new_epoch(&self, new_epoch: u64) -> Result<()> {
+        self.current_epoch.swap(new_epoch, Ordering::SeqCst);
+        StakeSmtStorage::new_epoch(self.stake_smt.as_ref(), new_epoch).await?;
+        DelegateSmtStorage::new_epoch(self.delegate_smt.as_ref(), new_epoch).await?;
+        self.kvdb.insert_current_epoch(new_epoch).await?;
+        Ok(())
+    }
+
     async fn handle_delegate_tx(
         &self,
         tx: &TransactionView,
@@ -169,6 +182,7 @@ impl Synchronization {
                 .into_bytes(),
         );
         let delegator = to_h160(&cell_args.delegator_addr());
+        let epoch = self.current_epoch.load(Ordering::SeqCst);
 
         log::info!("[sync] {} delegate", delegator);
 
@@ -177,8 +191,8 @@ impl Synchronization {
             .map(|r| DelegateDeltas::decode(&r).unwrap())
             .unwrap_or_default();
 
-        for item in delegate_cell_data.lock().delegator_infos().into_iter() {
-            let staker = to_h160(&item.staker());
+        for new_item in delegate_cell_data.lock().delegator_infos().into_iter() {
+            let staker = to_h160(&new_item.staker());
             log::info!("[sync] delegate to {}", staker);
 
             if !delegate_status.inner.contains_key(&staker) {
@@ -188,9 +202,20 @@ impl Synchronization {
                 });
             }
 
-            let original = delegate_status.inner.get_mut(&staker).unwrap();
-            let new: DelegateDelta = (&item).into();
-            let delta = new.sub(original);
+            let original = DelegateSmtStorage::get_amount(
+                self.delegate_smt.as_ref(),
+                epoch,
+                to_eth_h160(&staker),
+                to_eth_h160(&delegator),
+            )
+            .await?
+            .unwrap_or_default();
+            let is_increase = new_item.is_increase() == packed::Byte::new(1);
+            let delta = if is_increase {
+                original + to_u128(&new_item.amount())
+            } else {
+                original - to_u128(&new_item.amount())
+            } as u64;
 
             log::info!("[sync] delta is {:?}", delta);
 
@@ -201,10 +226,10 @@ impl Synchronization {
                         tx_hash:   tx.hash.clone().to_string(),
                         tx_block:  block_number as i64,
                         address:   delegator.to_string(),
-                        amount:    delta.delta.amount(),
+                        amount:    delta as i64,
                         operation: OperationType::Delegate.into(),
-                        event:     delta.delta.is_increase.into(),
-                        epoch:     0,
+                        event:     is_increase.into(),
+                        epoch:     epoch as i64,
                         status:    None,
                         timestamp: timestamp as i64,
                     }
@@ -212,12 +237,33 @@ impl Synchronization {
                 )
                 .await?;
 
-            *original = new;
+            DelegateSmtStorage::insert(
+                self.delegate_smt.as_ref(),
+                epoch,
+                to_eth_h160(&staker),
+                vec![UserAmount {
+                    user:        to_eth_h160(&delegator),
+                    amount:      to_u128(&new_item.amount()),
+                    is_increase: true,
+                }],
+            )
+            .await?;
         }
 
         self.kvdb
             .insert_delegator_status(&delegator.0, &delegate_status.encode())
             .await?;
+
+        let (_tx, _none_top) = DelegateSmtTxBuilder::new(
+            self.ckb_rpc_client.as_ref(),
+            self.priv_key.clone(),
+            epoch,
+            delegate_smt_type_ids(),
+            vec![],
+            self.delegate_smt.as_ref(),
+        )
+        .build_tx()
+        .await?;
 
         Ok(())
     }
@@ -244,14 +290,18 @@ impl Synchronization {
         );
         let staker = to_h160(&cell_args.stake_addr());
 
-        let original = &self
-            .kvdb
-            .get_staker_status(&staker.0)
-            .await?
-            .map(|r| Delta::decode(&r).unwrap())
-            .unwrap_or_default();
-        let new: Delta = (&stake_cell_data.lock().delta()).into();
-        let delta = new.sub(original);
+        let epoch = self.current_epoch.load(Ordering::SeqCst);
+        let original =
+            StakeSmtStorage::get_amount(self.stake_smt.as_ref(), epoch, to_eth_h160(&staker))
+                .await?
+                .unwrap_or_default();
+        let new = &stake_cell_data.lock().delta();
+        let is_increase = new.is_increase() == packed::Byte::new(1);
+        let delta = if is_increase {
+            original + to_u128(&new.amount())
+        } else {
+            original - to_u128(&new.amount())
+        } as u64;
 
         log::info!("[sync] delta is {:?}", delta);
 
@@ -262,28 +312,37 @@ impl Synchronization {
                     tx_hash:   tx.hash.clone().to_string(),
                     tx_block:  block_number as i64,
                     address:   staker.to_string(),
-                    amount:    delta.amount(),
+                    amount:    delta as i64,
                     operation: OperationType::Stake.into(),
-                    event:     delta.is_increase.into(),
-                    epoch:     0,
+                    event:     is_increase.into(),
+                    epoch:     epoch as i64,
                     status:    None,
                     timestamp: timestamp as i64,
                 }
                 .into(),
             )
             .await?;
-        self.kvdb
-            .insert_staker_status(&staker.0, &new.encode())
-            .await?;
         StakeSmtStorage::insert(
             self.stake_smt.as_ref(),
             self.current_epoch.load(Ordering::SeqCst),
             vec![UserAmount {
                 user:        to_eth_h160(&staker),
-                amount:      delta.amount() as u128,
-                is_increase: delta.is_increase,
+                amount:      to_u128(&new.amount()),
+                is_increase: true,
             }],
         )
+        .await?;
+
+        let (_tx, _none_top) = StakeSmtTxBuilder::new(
+            self.ckb_rpc_client.as_ref(),
+            self.priv_key.clone(),
+            epoch,
+            stake_smt_type_ids(),
+            10,
+            vec![],
+            self.stake_smt.as_ref(),
+        )
+        .build_tx()
         .await?;
 
         Ok(())

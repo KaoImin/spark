@@ -8,6 +8,7 @@ use std::{
 
 use api::run_server;
 use backtrace::Backtrace;
+use ckb_types::H256;
 use config::SparkConfig;
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use storage::{RelationDB, SmtManager, KVDB};
@@ -53,6 +54,7 @@ async fn main() {
         reward_smt,
         config.start_number,
         Arc::clone(&current_epoch),
+        H256::from_trimmed_str(&config.private_key[2..]).unwrap(),
     )
     .await;
 

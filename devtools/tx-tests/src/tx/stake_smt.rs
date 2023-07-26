@@ -54,7 +54,7 @@ pub async fn stake_smt_tx(ckb: &CkbRpcClient) {
         },
         10,
         vec![stake_cell],
-        smt,
+        &smt,
     )
     .build_tx()
     .await

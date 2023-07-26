@@ -53,7 +53,7 @@ pub async fn delegate_smt_tx(ckb: &CkbRpcClient) {
             xudt_owner,
         },
         vec![delegate_cell],
-        smt,
+        &smt,
     )
     .build_tx()
     .await

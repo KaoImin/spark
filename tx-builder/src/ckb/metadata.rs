@@ -39,7 +39,7 @@ pub struct MetadataSmtTxBuilder<'a, C: CkbRpc, PSmt> {
     type_ids:        TypeIds,
     last_checkpoint: Checkpoint,
     last_metadata:   Metadata,
-    smt:             PSmt,
+    smt:             &'a PSmt,
 }
 
 #[async_trait]
@@ -54,7 +54,7 @@ where
         type_ids: TypeIds,
         last_metadata: Metadata,
         last_checkpoint: Checkpoint,
-        smt: PSmt,
+        smt: &'a PSmt,
     ) -> Self {
         Self {
             ckb,
@@ -112,7 +112,7 @@ where
         ];
 
         ProposalSmtStorage::insert(
-            &self.smt,
+            self.smt,
             self.last_checkpoint.epoch,
             self.last_checkpoint
                 .propose_count
@@ -122,9 +122,9 @@ where
         )
         .await?;
 
-        let proposal_count_smt_root = ProposalSmtStorage::get_top_root(&self.smt).await?;
+        let proposal_count_smt_root = ProposalSmtStorage::get_top_root(self.smt).await?;
         let new_proposal_count_smt_proof =
-            ProposalSmtStorage::generate_top_proof(&self.smt, vec![self.last_checkpoint.epoch])
+            ProposalSmtStorage::generate_top_proof(self.smt, vec![self.last_checkpoint.epoch])
                 .await
                 .unwrap();
 
@@ -163,13 +163,13 @@ where
         impl Eq for EpochStakeInfo {}
         let (validators, no_top_stakers, no_top_delegators) = {
             let stakers =
-                StakeSmtStorage::get_sub_leaves(&self.smt, self.last_checkpoint.epoch).await?;
+                StakeSmtStorage::get_sub_leaves(self.smt, self.last_checkpoint.epoch).await?;
 
             let mut mid = std::collections::BinaryHeap::new();
 
             for (staker, amount) in stakers {
                 let delegaters = DelegateSmtStorage::get_sub_leaves(
-                    &self.smt,
+                    self.smt,
                     self.last_checkpoint.epoch,
                     staker,
                 )
@@ -213,24 +213,24 @@ where
         };
 
         let old_stake_smt_proof =
-            StakeSmtStorage::generate_top_proof(&self.smt, vec![self.last_checkpoint.epoch])
+            StakeSmtStorage::generate_top_proof(self.smt, vec![self.last_checkpoint.epoch])
                 .await
                 .unwrap();
 
         StakeSmtStorage::remove(
-            &self.smt,
+            self.smt,
             self.last_checkpoint.epoch,
             no_top_stakers.iter().map(|(a, _)| a).cloned().collect(),
         )
         .await
         .unwrap();
 
-        StakeSmtStorage::new_epoch(&self.smt, self.last_checkpoint.epoch + 1)
+        StakeSmtStorage::new_epoch(self.smt, self.last_checkpoint.epoch + 1)
             .await
             .unwrap();
 
         let new_stake_smt_proof =
-            StakeSmtStorage::generate_top_proof(&self.smt, vec![self.last_checkpoint.epoch + 1])
+            StakeSmtStorage::generate_top_proof(self.smt, vec![self.last_checkpoint.epoch + 1])
                 .await
                 .unwrap();
 
@@ -253,14 +253,14 @@ where
             }
         };
 
-        let new_stake_root = StakeSmtStorage::get_top_root(&self.smt).await.unwrap();
+        let new_stake_root = StakeSmtStorage::get_top_root(self.smt).await.unwrap();
 
         let mut old_delegator_roots = std::collections::VecDeque::with_capacity(validators.len());
 
         for v in validators.iter() {
             old_delegator_roots.push_back(
                 DelegateSmtStorage::generate_top_proof(
-                    &self.smt,
+                    self.smt,
                     vec![self.last_checkpoint.epoch],
                     v.staker,
                 )
@@ -274,15 +274,11 @@ where
             .flat_map(|(d, i)| i.keys().cloned().zip(std::iter::repeat(*d)))
             .collect();
 
-        DelegateSmtStorage::remove(
-            &self.smt,
-            self.last_checkpoint.epoch,
-            delegatets_remove_keys,
-        )
-        .await
-        .unwrap();
+        DelegateSmtStorage::remove(self.smt, self.last_checkpoint.epoch, delegatets_remove_keys)
+            .await
+            .unwrap();
 
-        DelegateSmtStorage::new_epoch(&self.smt, self.last_checkpoint.epoch + 1)
+        DelegateSmtStorage::new_epoch(self.smt, self.last_checkpoint.epoch + 1)
             .await
             .unwrap();
 
@@ -292,7 +288,7 @@ where
         let mut delegator_proofs = Vec::new();
         for v in validators.iter() {
             let delegate_new_epoch_proof = DelegateSmtStorage::generate_top_proof(
-                &self.smt,
+                self.smt,
                 vec![self.last_checkpoint.epoch + 1],
                 v.staker,
             )
@@ -318,7 +314,7 @@ where
             delegator_staker_smt_roots.push(StakerSmtRoot {
                 staker: v.staker.0.into(),
                 root:   Into::<[u8; 32]>::into(
-                    DelegateSmtStorage::get_top_root(&self.smt, v.staker)
+                    DelegateSmtStorage::get_top_root(self.smt, v.staker)
                         .await
                         .unwrap(),
                 )

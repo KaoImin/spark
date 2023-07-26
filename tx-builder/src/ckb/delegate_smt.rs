@@ -45,7 +45,7 @@ pub struct DelegateSmtTxBuilder<'a, C: CkbRpc, D: DelegateSmtStorage> {
     current_epoch:         Epoch,
     type_ids:              DelegateSmtTypeIds,
     delegate_cells:        Vec<Cell>,
-    delegate_smt_storage:  D,
+    delegate_smt_storage:  &'a D,
     inputs_delegate_cells: HashMap<Delegator, Cell>,
 }
 
@@ -59,7 +59,7 @@ impl<'a, C: CkbRpc, D: DelegateSmtStorage> IDelegateSmtTxBuilder<'a, C, D>
         current_epoch: Epoch,
         type_ids: DelegateSmtTypeIds,
         delegate_cells: Vec<Cell>,
-        delegate_smt_storage: D,
+        delegate_smt_storage: &'a D,
     ) -> Self {
         Self {
             ckb,
