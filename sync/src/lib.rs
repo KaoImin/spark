@@ -22,11 +22,12 @@ use common::utils::convert::{to_eth_h160, to_h160, to_u128, to_u64};
 use rpc_client::ckb_client::ckb_rpc_client::CkbRpcClient;
 use storage::{RelationDB, SmtManager, KVDB};
 use tokio::time::sleep;
+use tx_builder::ckb::helper::{Stake ,Xudt};
 use tx_builder::ckb::{delegate_smt::DelegateSmtTxBuilder, stake_smt::StakeSmtTxBuilder};
 use tx_builder::ckb::{
     delegate_smt_type_ids, stake_smt_type_ids, AXON_TOKEN_ARGS, DELEGATE_AT_CODE_HASH,
     DELEGATE_SMT_CODE_HASH, ISSUANCE_TYPE_ID, METADATA_CODE_HASH, METADATA_TYPE_ID,
-    STAKE_AT_CODE_HASH, STAKE_SMT_CODE_HASH,
+    STAKE_AT_CODE_HASH, STAKE_SMT_CODE_HASH, XUDT_OWNER,
 };
 
 macro_rules! match_err {
@@ -333,13 +334,22 @@ impl Synchronization {
         )
         .await?;
 
+        let stake_cell = Stake::get_cell(
+            self.ckb_rpc_client.as_ref(),
+            Stake::lock(&*METADATA_TYPE_ID.load(), &staker),
+            Xudt::type_(&(XUDT_OWNER.load()).pack()),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    
         let (_tx, _none_top) = StakeSmtTxBuilder::new(
             self.ckb_rpc_client.as_ref(),
             self.priv_key.clone(),
             epoch,
             stake_smt_type_ids(),
             10,
-            vec![],
+            vec![stake_cell],
             self.stake_smt.as_ref(),
         )
         .build_tx()
